@@ -51,26 +51,6 @@ spec:
           readOnly: true
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-        livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - "ps aux | grep -v grep | grep plugin"
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - "ps aux | grep -v grep | grep plugin"
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
       volumes:
       - name: config
         configMap:

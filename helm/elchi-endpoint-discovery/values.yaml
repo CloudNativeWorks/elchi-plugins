@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: cloudnativeworks/elchi-endpoint-discovery
+  repository: jhonbrownn/elchi-endpoint-discovery
   pullPolicy: IfNotPresent
   tag: "latest"
 
