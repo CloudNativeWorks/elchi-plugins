@@ -86,12 +86,13 @@ jobs:
           IMAGE_NAME="${DOCKER_USERNAME}/${PLUGIN_NAME}"
           IMAGE_TAG="${IMAGE_NAME}:v${PROJECT_VERSION}-amd64"
           
-          # Build AMD64 platform
+          # Build AMD64 platform (build context is root directory)
           docker buildx build \
             --no-cache \
             --platform linux/amd64 \
             --build-arg "PLUGIN_NAME=${PLUGIN_NAME}" \
             --build-arg "PROJECT_VERSION=${PROJECT_VERSION}" \
+            --build-arg "TARGETARCH=amd64" \
             -t "${IMAGE_TAG}" \
             -f Dockerfile \
             --load \
@@ -147,12 +148,13 @@ jobs:
           IMAGE_NAME="${DOCKER_USERNAME}/${PLUGIN_NAME}"
           IMAGE_TAG="${IMAGE_NAME}:v${PROJECT_VERSION}-arm64"
           
-          # Build ARM64 platform
+          # Build ARM64 platform (build context is root directory)
           docker buildx build \
             --no-cache \
             --platform linux/arm64 \
             --build-arg "PLUGIN_NAME=${PLUGIN_NAME}" \
             --build-arg "PROJECT_VERSION=${PROJECT_VERSION}" \
+            --build-arg "TARGETARCH=arm64" \
             -t "${IMAGE_TAG}" \
             -f Dockerfile \
             --load \

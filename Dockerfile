@@ -4,28 +4,27 @@ FROM golang:1.21-alpine AS builder
 # Install git for go modules
 RUN apk add --no-cache git ca-certificates
 
-# Set working directory
-WORKDIR /workspace
-
-# Copy go workspace files
-COPY go.work go.work
-COPY pkg/ pkg/
-
 # Get plugin name from build arg
 ARG PLUGIN_NAME
 ARG PROJECT_VERSION
 
-# Validate plugin directory exists
-COPY ${PLUGIN_NAME}/ ${PLUGIN_NAME}/
+# Set working directory
+WORKDIR /workspace
+
+# Copy all workspace files (build context should be from root)
+COPY . .
+
+# Check if plugin exists
+RUN test -d "${PLUGIN_NAME}" || (echo "Plugin directory ${PLUGIN_NAME} not found" && exit 1)
 
 # Build the specific plugin
 WORKDIR /workspace/${PLUGIN_NAME}
 
-# Download dependencies
+# Download dependencies (this will use the workspace and local pkg module)
 RUN go mod download
 
 # Build static binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
     go build -a -installsuffix cgo \
     -ldflags="-w -s -X main.Version=${PROJECT_VERSION}" \
     -o /plugin \
