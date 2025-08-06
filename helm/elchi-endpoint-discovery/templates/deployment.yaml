@@ -35,8 +35,6 @@ spec:
         env:
         - name: ELCHI_CONFIG
           value: "/etc/elchi/config.yaml"
-        - name: DISCOVERY_INTERVAL
-          value: {{ .Values.discoveryInterval | quote }}
         {{- range .Values.env }}
         - name: {{ .name }}
           value: {{ .value | quote }}

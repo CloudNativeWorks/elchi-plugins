@@ -9,12 +9,15 @@ data:
   config.yaml: |
     elchi:
       token: {{ .Values.config.token | quote }}
+      api_endpoint: {{ .Values.config.apiEndpoint | quote }}
+      insecure_skip_verify: {{ .Values.config.insecureSkipVerify }}
     
     log:
       level: {{ .Values.config.log.level | quote }}
       format: {{ .Values.config.log.format | quote }}
       output: {{ .Values.config.log.output | quote }}
     
-    {{- if .Values.config.namespace }}
-    namespace: {{ .Values.config.namespace | quote }}
+    discovery_interval: {{ .Values.discoveryInterval }}
+    {{- if .Values.clusterName }}
+    cluster_name: {{ .Values.clusterName | quote }}
     {{- end }}

@@ -34,7 +34,6 @@ The following table lists the configurable parameters and their default values.
 | `config.token` | Elchi authentication token | `""` |
 | `config.log.level` | Log level | `info` |
 | `config.log.format` | Log format (text/json) | `json` |
-| `config.namespace` | Target namespace (empty = all) | `""` |
 | `discoveryInterval` | Discovery interval in seconds | `30` |
 | `resources.requests.cpu` | CPU request | `100m` |
 | `resources.requests.memory` | Memory request | `64Mi` |
@@ -60,13 +59,6 @@ helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
   --set resources.limits.memory="256Mi"
 ```
 
-### Monitor Specific Namespace
-
-```bash
-helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
-  --set config.token="your-token" \
-  --set config.namespace="production"
-```
 
 ### Enable Debug Logging
 

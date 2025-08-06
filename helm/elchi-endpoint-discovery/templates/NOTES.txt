@@ -8,11 +8,7 @@ Namespace: {{ .Release.Namespace }}
 - Discovery Interval: {{ .Values.discoveryInterval }}s
 - Log Level: {{ .Values.config.log.level }}
 - Log Format: {{ .Values.config.log.format }}
-{{- if .Values.config.namespace }}
-- Target Namespace: {{ .Values.config.namespace }}
-{{- else }}
-- Target Namespace: All namespaces
-{{- end }}
+- Target: All namespaces
 - Replicas: {{ .Values.replicaCount }}
 
 🔍 To check the status of your deployment:

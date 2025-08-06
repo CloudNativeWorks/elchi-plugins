@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: jhonbrownn/elchi-endpoint-discovery
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   tag: "latest"
 
 imagePullSecrets: []
@@ -45,28 +45,22 @@ securityContext:
 config:
   # Elchi token for authentication
   token: ""
+  # API endpoint to send discovery results
+  apiEndpoint: ""
+  # Skip TLS certificate verification (use with caution)
+  insecureSkipVerify: false
   # Log configuration
   log:
     level: "info"
     format: "json"  # Use JSON format for production
     output: "stdout"
-  # Kubernetes namespace to monitor (empty = all namespaces)
-  namespace: ""
 
 # Discovery interval in seconds
 discoveryInterval: 30
 
-# Environment variables from secrets/configmaps
-envFrom: []
-  # - secretRef:
-  #     name: elchi-secrets
-  # - configMapRef:
-  #     name: elchi-config
+# Cluster name override (optional, auto-detected if not set)
+clusterName: ""
 
-# Additional environment variables
-env: []
-  # - name: CUSTOM_VAR
-  #   value: "custom-value"
 
 resources:
   limits:

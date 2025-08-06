@@ -4,20 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
 	"time"
 
+	"github.com/CloudNativeWorks/elchi-plugins/elchi-endpoint-discovery/api"
+	"github.com/CloudNativeWorks/elchi-plugins/elchi-endpoint-discovery/discovery"
 	"github.com/CloudNativeWorks/elchi-plugins/pkg/config"
 	elchiContext "github.com/CloudNativeWorks/elchi-plugins/pkg/context"
 	"github.com/CloudNativeWorks/elchi-plugins/pkg/logger"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
 
 func main() {
@@ -36,44 +31,47 @@ func main() {
 
 	ctx := elchiContext.WithConfig(context.Background(), cfg)
 
-	// Get discovery interval from environment variable
-	intervalStr := os.Getenv("DISCOVERY_INTERVAL")
-	if intervalStr == "" {
-		intervalStr = "30" // default 30 seconds
-	}
-
-	intervalSec, err := strconv.Atoi(intervalStr)
-	if err != nil {
-		log.WithError(err).Warn("Invalid DISCOVERY_INTERVAL, using default 30 seconds")
-		intervalSec = 30
+	// Get discovery interval from config
+	intervalSec := cfg.DiscoveryInterval
+	if intervalSec <= 0 {
+		intervalSec = 30 // default 30 seconds if not set or invalid
 	}
 
 	interval := time.Duration(intervalSec) * time.Second
 
 	log.WithPlugin("endpoint-discovery").Info("Starting elchi-endpoint-discovery service")
-	log.WithFields(map[string]interface{}{
+	log.WithFields(map[string]any{
 		"token_configured":   cfg.Elchi.Token != "",
+		"api_endpoint":       cfg.Elchi.APIEndpoint,
 		"discovery_interval": interval.String(),
+		"insecure_tls":       cfg.Elchi.InsecureSkipVerify,
 	}).Info("Configuration loaded")
 
-	clientset, err := getKubernetesClient(cfg.KubeConfig)
+	// Create Kubernetes client
+	clientset, err := getKubernetesClient()
 	if err != nil {
 		log.WithError(err).Fatal("Failed to create Kubernetes client")
 		return
 	}
+
+	// Create discovery service
+	discoveryService := discovery.NewService(clientset, cfg.ClusterName)
+
+	// Create API client
+	apiClient := api.NewClient(cfg, log)
 
 	// Continuous discovery loop
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	// Run discovery immediately on startup
-	runDiscovery(ctx, log, clientset)
+	runDiscovery(ctx, log, discoveryService, apiClient)
 
 	// Then run on schedule
 	for {
 		select {
 		case <-ticker.C:
-			runDiscovery(ctx, log, clientset)
+			runDiscovery(ctx, log, discoveryService, apiClient)
 		case <-ctx.Done():
 			log.Info("Shutdown signal received, stopping discovery")
 			return
@@ -81,63 +79,15 @@ func main() {
 	}
 }
 
-type ClusterInfo struct {
-	Name    string `json:"cluster_name"`
-	Version string `json:"cluster_version"`
-}
-
-type NodeInfo struct {
-	Name      string            `json:"name"`
-	Status    string            `json:"status"`
-	Version   string            `json:"version"`
-	Addresses map[string]string `json:"addresses"`
-}
-
-type DiscoveryResult struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	ClusterInfo ClusterInfo `json:"cluster_info"`
-	NodeCount   int         `json:"node_count"`
-	Nodes       []NodeInfo  `json:"nodes"`
-	Duration    string      `json:"discovery_duration"`
-}
-
-func runDiscovery(ctx context.Context, log *logger.Logger, clientset *kubernetes.Clientset) {
-	discoveryStart := time.Now()
-
-	// Get cluster info
-	clusterInfo := getClusterInfo(ctx, clientset)
-
-	nodes, err := discoverNodes(ctx, clientset)
+func runDiscovery(ctx context.Context, log *logger.Logger, discoveryService *discovery.Service, apiClient *api.Client) {
+	// Perform discovery
+	result, err := discoveryService.DiscoverNodes(ctx)
 	if err != nil {
 		log.WithError(err).Error("Failed to discover nodes")
 		return
 	}
 
-	// Build discovery result
-	result := DiscoveryResult{
-		Timestamp:   time.Now(),
-		ClusterInfo: clusterInfo,
-		NodeCount:   len(nodes.Items),
-		Nodes:       make([]NodeInfo, 0, len(nodes.Items)),
-		Duration:    time.Since(discoveryStart).String(),
-	}
-
-	for _, node := range nodes.Items {
-		nodeInfo := NodeInfo{
-			Name:      node.Name,
-			Status:    getNodeStatus(&node),
-			Version:   node.Status.NodeInfo.KubeletVersion,
-			Addresses: make(map[string]string),
-		}
-
-		for _, address := range node.Status.Addresses {
-			nodeInfo.Addresses[string(address.Type)] = address.Address
-		}
-
-		result.Nodes = append(result.Nodes, nodeInfo)
-	}
-
-	// Print as pretty JSON
+	// Print as pretty JSON to stdout
 	jsonOutput, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal discovery result to JSON")
@@ -146,7 +96,13 @@ func runDiscovery(ctx context.Context, log *logger.Logger, clientset *kubernetes
 
 	fmt.Println(string(jsonOutput))
 
-	log.WithFields(map[string]interface{}{
+	// Send to API if configured
+	if err := apiClient.SendDiscoveryResult(result); err != nil {
+		log.WithError(err).Error("Failed to send discovery result to API")
+		// Don't return here - we still want to continue discovery even if API fails
+	}
+
+	log.WithFields(map[string]any{
 		"node_count":      result.NodeCount,
 		"duration":        result.Duration,
 		"cluster_name":    result.ClusterInfo.Name,
@@ -154,80 +110,13 @@ func runDiscovery(ctx context.Context, log *logger.Logger, clientset *kubernetes
 	}).Info("Discovery completed")
 }
 
-func getClusterInfo(ctx context.Context, clientset *kubernetes.Clientset) ClusterInfo {
-	info := ClusterInfo{
-		Name:    "unknown",
-		Version: "unknown",
-	}
-
-	// Try to get cluster name from kubeadm configmap
-	configMap, err := clientset.CoreV1().ConfigMaps("kube-system").Get(ctx, "kubeadm-config", metav1.GetOptions{})
-	if err == nil && configMap != nil {
-		if clusterConfig, ok := configMap.Data["ClusterConfiguration"]; ok {
-			// Simple parsing - in production you'd use proper YAML parsing
-			if len(clusterConfig) > 0 {
-				info.Name = "kubernetes-cluster"
-			}
-		}
-	}
-
-	// Get cluster version from server version
-	version, err := clientset.Discovery().ServerVersion()
-	if err == nil && version != nil {
-		info.Version = version.GitVersion
-	}
-
-	// Try to get cluster name from nodes if not found
-	if info.Name == "unknown" {
-		nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-		if err == nil && len(nodes.Items) > 0 {
-			// Use first node's cluster name label if exists
-			if clusterName, ok := nodes.Items[0].Labels["kubernetes.io/cluster-name"]; ok {
-				info.Name = clusterName
-			} else if nodes.Items[0].Spec.ProviderID != "" {
-				info.Name = "kubernetes-cluster"
-			}
-		}
-	}
-
-	return info
-}
-
-func getKubernetesClient(kubeConfigPath string) (*kubernetes.Clientset, error) {
-	var config *rest.Config
-	var err error
-
-	if kubeConfigPath == "" {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			if home := homedir.HomeDir(); home != "" {
-				kubeConfigPath = filepath.Join(home, ".kube", "config")
-			}
-		}
-	}
-
-	if config == nil {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-		if err != nil {
-			return nil, err
-		}
+func getKubernetesClient() (*kubernetes.Clientset, error) {
+	// This service ONLY runs inside Kubernetes
+	// It discovers nodes of the cluster it's running in
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %w. This service must run inside a Kubernetes cluster", err)
 	}
 
 	return kubernetes.NewForConfig(config)
-}
-
-func discoverNodes(ctx context.Context, clientset *kubernetes.Clientset) (*v1.NodeList, error) {
-	return clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-}
-
-func getNodeStatus(node *v1.Node) string {
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == v1.NodeReady {
-			if condition.Status == v1.ConditionTrue {
-				return "Ready"
-			}
-			return "NotReady"
-		}
-	}
-	return "Unknown"
 }
