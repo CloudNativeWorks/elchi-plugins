@@ -1,0 +1,9 @@
+elchi:
+  token: "sample-token-123"
+
+log:
+  level: "info"
+  format: "text"
+  output: "stdout"
+
+namespace: "default"
