@@ -46,7 +46,7 @@ config:
   # Elchi token for authentication
   token: ""
   # API endpoint to send discovery results
-  apiEndpoint: ""
+  apiEndpoint: "http://sdsdsde32ed.com"
   # Skip TLS certificate verification (use with caution)
   insecureSkipVerify: false
   # Log configuration
@@ -58,7 +58,7 @@ config:
 # Discovery interval in seconds
 discoveryInterval: 30
 
-# Cluster name override (optional, auto-detected if not set)
+# Cluster name (REQUIRED - must be set)
 clusterName: ""
 
 

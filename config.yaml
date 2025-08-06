@@ -29,7 +29,6 @@ log:
 # How often to scan and report cluster nodes
 discovery_interval: 30
 
-# Cluster name override
-# Leave empty for auto-detection from cluster
-# Auto-detection tries: kubeadm-config, cluster-info, node labels, etc.
-cluster_name: ""
+# Cluster name (REQUIRED)
+# Must be set - no auto-detection
+cluster_name: "my-kubernetes-cluster"

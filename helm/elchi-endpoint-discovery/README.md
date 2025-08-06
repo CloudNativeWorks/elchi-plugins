@@ -35,6 +35,7 @@ The following table lists the configurable parameters and their default values.
 | `config.log.level` | Log level | `info` |
 | `config.log.format` | Log format (text/json) | `json` |
 | `discoveryInterval` | Discovery interval in seconds | `30` |
+| `clusterName` | Cluster name (**REQUIRED**) | `""` |
 | `resources.requests.cpu` | CPU request | `100m` |
 | `resources.requests.memory` | Memory request | `64Mi` |
 | `resources.limits.cpu` | CPU limit | `200m` |
@@ -42,11 +43,12 @@ The following table lists the configurable parameters and their default values.
 
 ## Examples
 
-### Basic Installation with Token
+### Basic Installation with Token and Cluster Name
 
 ```bash
 helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
-  --set config.token="your-elchi-token-here"
+  --set config.token="your-elchi-token-here" \
+  --set clusterName="production-cluster"
 ```
 
 ### Custom Discovery Interval and Resources
@@ -54,6 +56,7 @@ helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
 ```bash
 helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
   --set config.token="your-token" \
+  --set clusterName="my-cluster" \
   --set discoveryInterval=60 \
   --set resources.requests.memory="128Mi" \
   --set resources.limits.memory="256Mi"
@@ -65,6 +68,7 @@ helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
 ```bash
 helm install endpoint-discovery ./helm/elchi-endpoint-discovery \
   --set config.token="your-token" \
+  --set clusterName="my-cluster" \
   --set config.log.level="debug" \
   --set config.log.format="text"
 ```

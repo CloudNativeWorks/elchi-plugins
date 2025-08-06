@@ -31,6 +31,12 @@ func main() {
 
 	ctx := elchiContext.WithConfig(context.Background(), cfg)
 
+	// Validate required config fields
+	if cfg.ClusterName == "" {
+		log.Fatal("Cluster name is required. Please set cluster_name in config or CLUSTER_NAME environment variable")
+		return
+	}
+
 	// Get discovery interval from config
 	intervalSec := cfg.DiscoveryInterval
 	if intervalSec <= 0 {
